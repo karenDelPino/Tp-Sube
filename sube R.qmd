@@ -1,0 +1,65 @@
+---
+title: "SUBE AMBA: patrones de uso del transporte público"
+author: "Valentina Barroso y Karen Del Pino"
+format: html
+toc: true
+editor: visual
+---
+
+### CHUNK 1: Librerías 
+
+\*Cargamos las herramientas de R que que se utilizan en todo el reporte (lectura de csv, manipulación de datos, gráficos).
+
+```{r}
+library(tidyverse)
+```
+
+## SECCIÓN 1- Importar y describir el dataset
+
+### CHUNK 2: 
+
+\*Traemos el archivo csv a R como una tabla, muestra su estructura (filas, columnas, tipos de dato) y un resumen estadístico rápido de cada columna.
+
+```{r}
+datos <- read_csv("datos/dataset_sube.csv")
+glimpse(datos)
+summary(datos)
+```
+
+## SECCIÓN 2- "Clasificación de variables" 
+
+### CHUNK 3: 
+
+\*Conviertimos el número de día (0, 1, 2...) en su nombre real ("Lunes", "Martes"...), para que las tablas y gráficos sean más fáciles de leer en vez de mostrar números crípticos.
+
+\*Numéricas: colectivo_amba, subte_amba, tren_amba
+
+\*Categoría: anio, mes, dia_semana.
+
+```{r}
+dias <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+datos <- datos %>%
+  mutate(dia_semana_lbl = factor(dias[dia_semana + 1], levels = dias))
+```
+
+## Sección 3- "Medidas de posición"
+
+### CHUNK 4:
+
+\*Calcula el promedio y la medida de usuarios diarios, por cada medio de transporte.
+
+```{r}
+datos %>%
+  summarise(
+    media_colectivo = mean(colectivo_amba, na.rm = TRUE),
+    mediana_colectivo = median(colectivo_amba, na.rm = TRUE),
+    media_subte = mean(subte_amba, na.rm = TRUE),
+    mediana_subte = median(subte_amba, na.rm = TRUE),
+    media_tren = mean(tren_amba, na.rm = TRUE),
+    mediana_tren = median(tren_amba, na.rm = TRUE)
+  
+```
+
+### CHUNK 5:
+
+\*undefined
