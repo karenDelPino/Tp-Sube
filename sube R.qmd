@@ -6,7 +6,9 @@ toc: true
 editor: visual
 ---
 
-### CHUNK 1: Librerías 
+## SECCIÓN 1- Importar y describir el dataset
+
+### Chunk 1: Librerías
 
 \*Cargamos las herramientas de R que que se utilizan en todo el reporte (lectura de csv, manipulación de datos, gráficos).
 
@@ -14,9 +16,7 @@ editor: visual
 library(tidyverse)
 ```
 
-## SECCIÓN 1- Importar y describir el dataset
-
-### CHUNK 2: 
+### Chunk 2:
 
 \*Traemos el archivo csv a R como una tabla, muestra su estructura (filas, columnas, tipos de dato) y un resumen estadístico rápido de cada columna.
 
@@ -26,9 +26,9 @@ glimpse(datos)
 summary(datos)
 ```
 
-## SECCIÓN 2- "Clasificación de variables" 
+## SECCIÓN 2- "Clasificación de variables"
 
-### CHUNK 3: 
+### Chunk 3:
 
 \*Conviertimos el número de día (0, 1, 2...) en su nombre real ("Lunes", "Martes"...), para que las tablas y gráficos sean más fáciles de leer en vez de mostrar números crípticos.
 
@@ -44,22 +44,158 @@ datos <- datos %>%
 
 ## Sección 3- "Medidas de posición"
 
-### CHUNK 4:
+### Chunk 4:
 
-\*Calcula el promedio y la medida de usuarios diarios, por cada medio de transporte.
+\*Calculamos el promedio y la medida de usuarios diarios, por cada medio de transporte.
+
+```{r}
+datos %>% 
+  summarise( 
+    media_colectivo = mean(colectivo_amba, na.rm = TRUE), 
+    mediana_colectivo = median(colectivo_amba, na.rm = TRUE), 
+    media_subte = mean(subte_amba, na.rm = TRUE),
+    mediana_subte = median(subte_amba, na.rm = TRUE), 
+    media_tren = mean(tren_amba, na.rm = TRUE),
+    mediana_tren = median(tren_amba, na.rm = TRUE) 
+)
+```
+
+### Chunk 5:
+
+\*Calcula el valor que más se repite en cada variable.
+
+```{r}
+moda <- function(x) {
+  ux <- unique(na.omit(x))
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+moda(datos$colectivo_amba)
+moda(datos$subte_amba)
+moda(datos$tren_amba)
+
+```
+
+#### Chunk 6:
+
+\*Calculamos los cuartiles (25%, 50%, 75%) y deciles (de a 10%), que muestran cómo se reparten los datos, no solo su centro.
+
+```{r}
+quantile(datos$colectivo_amba, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+quantile(datos$colectivo_amba, probs = seq(0, 1, 0.1), na.rm = TRUE)
+
+quantile(datos$subte_amba, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+quantile(datos$subte_amba, probs = seq(0, 1, 0.1), na.rm = TRUE)
+
+quantile(datos$tren_amba, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+quantile(datos$tren_amba, probs = seq(0, 1, 0.1), na.rm = TRUE)
+```
+
+## SECCIÓN 4- "Histogramas y boxplots"
+
+#### Chunk 7: 
+
+\*Generamos el histograma (cuántos días tuvieron cierta cantidad de usuarios) y el boxplot (mediana, rango típico y outliers) de **colectivo.**
+
+```{r}
+ggplot(datos, aes(x = colectivo_amba)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  labs(title = "Histograma - Usuarios de colectivo", x = "Usuarios", y = "Frecuencia")
+
+ggplot(datos, aes(y = colectivo_amba)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Boxplot - Usuarios de colectivo")
+```
+
+#### Chunk 8:
+
+\*Lo mismo, para **subte.**
+
+```{r}
+ggplot(datos, aes(x = subte_amba)) +
+  geom_histogram(bins = 30, fill = "darkorange", color = "white") +
+  labs(title = "Histograma - Usuarios de subte", x = "Usuarios", y = "Frecuencia")
+
+ggplot(datos, aes(y = subte_amba)) +
+  geom_boxplot(fill = "moccasin") +
+  labs(title = "Boxplot - Usuarios de subte")
+```
+
+#### Chunk 9:
+
+\*Lo mismo, para **tren.**
+
+```{r}
+ggplot(datos, aes(x = tren_amba)) +
+  geom_histogram(bins = 30, fill = "forestgreen", color = "white") +
+  labs(title = "Histograma - Usuarios de tren", x = "Usuarios", y = "Frecuencia")
+
+ggplot(datos, aes(y = tren_amba)) +
+  geom_boxplot(fill = "palegreen") +
+  labs(title = "Boxplot - Usuarios de tren")
+```
+
+## SECCIÓN 5- Interpretación del histograma.
+
+#### Chunk 10:
+
+\*Calculamos qué tan ancho es cada intervalo del histograma (rango total dividido en 10 partes), para colectivo.
+
+```{r}
+rango <- max(datos$colectivo_amba, na.rm = TRUE) - min(datos$colectivo_amba, na.rm = TRUE)
+amplitud <- rango / 10
+amplitud
+```
+
+#### Chunk 11:
+
+\*Días que caen en cada intervalo (tabla de frecuencias) para colectivo, con frecuencia relativa, porcentual y acumulada.
 
 ```{r}
 datos %>%
-  summarise(
-    media_colectivo = mean(colectivo_amba, na.rm = TRUE),
-    mediana_colectivo = median(colectivo_amba, na.rm = TRUE),
-    media_subte = mean(subte_amba, na.rm = TRUE),
-    mediana_subte = median(subte_amba, na.rm = TRUE),
-    media_tren = mean(tren_amba, na.rm = TRUE),
-    mediana_tren = median(tren_amba, na.rm = TRUE)
-  
+  mutate(intervalo = cut(colectivo_amba, breaks = 10)) %>%
+  count(intervalo) %>%
+  mutate(
+    frec_relativa = n / sum(n),
+    frec_porcentual = round(frec_relativa * 100, 2),
+    frec_acumulada = cumsum(n)
+  )
 ```
 
-### CHUNK 5:
+#### Chunk 12: 
 
-\*undefined
+\*Lo mismo, para **subte.**
+
+```{r}
+datos %>%
+  mutate(intervalo = cut(subte_amba, breaks = 10)) %>%
+  count(intervalo) %>%
+  mutate(
+    frec_relativa = n / sum(n),
+    frec_porcentual = round(frec_relativa * 100, 2),
+    frec_acumulada = cumsum(n)
+  )
+```
+
+#### Chunk 13: 
+
+\*Lo mismo, para **tren.**
+
+```{r}
+datos %>%
+  mutate(intervalo = cut(tren_amba, breaks = 10)) %>%
+  count(intervalo) %>%
+  mutate(
+    frec_relativa = n / sum(n),
+    frec_porcentual = round(frec_relativa * 100, 2),
+    frec_acumulada = cumsum(n)
+  )
+```
+
+## Conclusiones final.
+
+El colectivo es el medio de transporte más usado en el AMBA, muy por encima de subte y tren. Los tres muestran un patrón semanal claro: los fines de semana (sobre todo los domingos) tienen bastante menos usuarios que los días hábiles.
+
+Durante marzo-mayo de 2020, con el inicio de la pandemia, el uso cayó abruptamente, generando outliers marcados en los boxplots. A partir de 2021 el uso se fue recuperando hasta estabilizarse en niveles similares a los previos a la pandemia.
+
+Por estos dos factores (ciclo semanal y pandemia), las tres variables presentan distribuciones con sesgo hacia la izquierda, en vez de una forma simétrica.
