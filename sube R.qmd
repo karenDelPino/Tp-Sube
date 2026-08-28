@@ -1,7 +1,7 @@
 ---
 title: "SUBE AMBA: patrones de uso del transporte público"
 author: "Valentina Barroso y Karen Del Pino"
-format: html
+format: pdf
 toc: true
 editor: visual
 ---
@@ -93,7 +93,7 @@ quantile(datos$tren_amba, probs = seq(0, 1, 0.1), na.rm = TRUE)
 
 ## SECCIÓN 4- "Histogramas y boxplots"
 
-#### Chunk 7: 
+#### Chunk 7:
 
 \*Generamos el histograma (cuántos días tuvieron cierta cantidad de usuarios) y el boxplot (mediana, rango típico y outliers) de **colectivo.**
 
@@ -162,7 +162,7 @@ datos %>%
   )
 ```
 
-#### Chunk 12: 
+#### Chunk 12:
 
 \*Lo mismo, para **subte.**
 
@@ -177,7 +177,7 @@ datos %>%
   )
 ```
 
-#### Chunk 13: 
+#### Chunk 13:
 
 \*Lo mismo, para **tren.**
 
