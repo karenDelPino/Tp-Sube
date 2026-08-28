@@ -1,7 +1,7 @@
 ---
 title: "SUBE AMBA: patrones de uso del transporte público"
 author: "Valentina Barroso y Karen Del Pino"
-format: html
+format: pdf
 toc: true
 editor: visual
 ---
