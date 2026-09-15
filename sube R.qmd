@@ -1,7 +1,7 @@
 ---
 title: "SUBE AMBA: patrones de uso del transporte público"
 author: "Valentina Barroso y Karen Del Pino"
-format: html
+format: pdf
 toc: true
 editor: visual
 ---
@@ -14,6 +14,7 @@ editor: visual
 
 ```{r}
 library(tidyverse)
+library(scales)
 ```
 
 ### Chunk 2:
@@ -100,10 +101,13 @@ quantile(datos$tren_amba, probs = seq(0, 1, 0.1), na.rm = TRUE)
 ```{r}
 ggplot(datos, aes(x = colectivo_amba)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  # scale = 1e-6 divide el número por un millón, suffix = "M" le agrega la letra
+  scale_x_continuous(labels = label_number(scale = 1e-6, suffix = "M")) + 
   labs(title = "Histograma - Usuarios de colectivo", x = "Usuarios", y = "Frecuencia")
 
 ggplot(datos, aes(y = colectivo_amba)) +
   geom_boxplot(fill = "lightblue") +
+  scale_y_continuous(labels = label_number(scale = 1e-6, suffix = "M")) +
   labs(title = "Boxplot - Usuarios de colectivo")
 ```
 
@@ -114,10 +118,12 @@ ggplot(datos, aes(y = colectivo_amba)) +
 ```{r}
 ggplot(datos, aes(x = subte_amba)) +
   geom_histogram(bins = 30, fill = "darkorange", color = "white") +
+  scale_x_continuous(labels = label_number(scale = 1e-3, suffix = "K")) +
   labs(title = "Histograma - Usuarios de subte", x = "Usuarios", y = "Frecuencia")
 
 ggplot(datos, aes(y = subte_amba)) +
   geom_boxplot(fill = "moccasin") +
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "K")) +
   labs(title = "Boxplot - Usuarios de subte")
 ```
 
@@ -128,9 +134,10 @@ ggplot(datos, aes(y = subte_amba)) +
 ```{r}
 ggplot(datos, aes(x = tren_amba)) +
   geom_histogram(bins = 30, fill = "forestgreen", color = "white") +
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "K")) + 
   labs(title = "Histograma - Usuarios de tren", x = "Usuarios", y = "Frecuencia")
 
-ggplot(datos, aes(y = tren_amba)) +
+ggplot(datos, aes(x = tren_amba)) +
   geom_boxplot(fill = "palegreen") +
   labs(title = "Boxplot - Usuarios de tren")
 ```
