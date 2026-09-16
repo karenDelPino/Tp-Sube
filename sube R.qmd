@@ -134,11 +134,11 @@ ggplot(datos, aes(y = subte_amba)) +
 ```{r}
 ggplot(datos, aes(x = tren_amba)) +
   geom_histogram(bins = 30, fill = "forestgreen", color = "white") +
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "K")) + 
   labs(title = "Histograma - Usuarios de tren", x = "Usuarios", y = "Frecuencia")
 
-ggplot(datos, aes(x = tren_amba)) +
+ggplot(datos, aes(y = tren_amba)) +
   geom_boxplot(fill = "palegreen") +
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "K")) +
   labs(title = "Boxplot - Usuarios de tren")
 ```
 
