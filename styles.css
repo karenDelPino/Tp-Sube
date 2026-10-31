@@ -1,0 +1,61 @@
+/* Fondo general apenas grisáceo */
+body {
+  background-color: #f8fafc !important;
+}
+
+/* Tarjetas redondeadas y con sombra suave */
+.card, .bslib-card {
+  border-radius: 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid #f1f5f9 !important;
+  background-color: #ffffff !important;
+  overflow: visible !important;
+}
+
+/* Títulos de las tarjetas limpios */
+.card-header, .bslib-card .card-header {
+  background-color: #ffffff !important;
+  border-bottom: none !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  font-weight: 600 !important;
+  font-size: 0.92rem !important;
+  color: #1e293b !important;
+  padding: 10px 16px 2px 16px !important;
+}
+
+/* Cuerpo de la tarjeta permitiendo que el desplegable salga hacia afuera */
+.card-body, .bslib-card .card-body {
+  overflow: visible !important;
+  padding: 6px 16px 8px 16px !important;
+}
+
+/* Asegurar que el menú desplegable de días pase por encima de los KPIs */
+.bslib-grid > :first-child, .dashboard-row:first-of-type {
+  z-index: 1050 !important;
+}
+
+.selectize-dropdown {
+  z-index: 9999 !important;
+}
+
+/* Ocultar el botón flotante de expandir tarjeta */
+bslib-tooltip, .bslib-full-screen-enter {
+  display: none !important;
+}
+
+/* Compactar SOLAMENTE los controles de filtro (sin tocar los gráficos) */
+.crosstalk-input-slider {
+  width: 90% !important;
+  margin: 4px auto 0 auto !important;
+  padding: 0 10px !important;
+}
+
+.irs--shiny {
+height: 52px !important;
+  margin-top: 2px !important;
+}
+
+.form-group, .crosstalk-input {
+  margin-bottom: 0 !important;
+}
