@@ -1,0 +1,252 @@
+---
+title: "Movilidad SUBE - AMBA"
+author: "Valentina Barroso y Karen Del Pino"
+format: 
+  dashboard:
+    orientation: rows
+    scrolling: true
+    theme: cosmo
+    css: styles.css
+server: shiny
+execute:
+  echo: false
+  warning: false
+---
+
+```{r}
+#| context: setup
+library(shiny)
+library(tidyverse)
+library(plotly)
+library(bslib)
+library(bsicons)
+library(DT)
+
+# 1. Leemos los datos (ruta local, sin "../")
+datos <- read_csv("datos/procesados/dataset_sube.csv", show_col_types = FALSE)
+
+# 2. Preparamos días, fecha, total diario y promedio móvil de 7 días
+dias <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+
+datos <- datos %>%
+  mutate(
+    dia_semana_lbl = factor(dias[dia_semana + 1], levels = dias),
+    fecha = seq.Date(from = as.Date("2020-01-01"), by = "day", length.out = n()),
+    total_viajes = colectivo_amba + tren_amba + subte_amba,
+    col_ma7   = as.numeric(stats::filter(colectivo_amba, rep(1/7, 7), sides = 1)),
+    tren_ma7  = as.numeric(stats::filter(tren_amba,      rep(1/7, 7), sides = 1)),
+    subte_ma7 = as.numeric(stats::filter(subte_amba,     rep(1/7, 7), sides = 1))
+  )
+
+# 3. Formato en español: millones con punto de miles (7.713 M = 7.713 millones)
+fmt_es <- function(x) {
+  if (is.na(x) || x == 0) return("0")
+  if (x >= 1e6) {
+    paste0(format(round(x / 1e6, 1), big.mark = ".", decimal.mark = ","), " M")
+  } else {
+    format(round(x), big.mark = ".", decimal.mark = ",")
+  }
+}
+```
+
+# Resumen
+
+## Row {height="150px"}
+
+### Column {width="60%"}
+
+```{r}
+#| title: "Rango de fechas"
+sliderInput(
+  inputId = "rango",
+  label = NULL,
+  min = min(datos$fecha),
+  max = max(datos$fecha),
+  value = c(min(datos$fecha), max(datos$fecha)),
+  timeFormat = "%d/%m/%Y",
+  width = "95%"
+)
+```
+
+### Column {width="40%"}
+
+```{r}
+#| title: "Días de la semana"
+checkboxGroupInput(
+  inputId = "dias",
+  label = NULL,
+  choices = dias,
+  selected = dias,
+  inline = TRUE
+)
+```
+
+## Row {height="145px"}
+
+```{r}
+bslib::value_box(
+  title = "Total de viajes",
+  value = textOutput("vb_total"),
+  showcase = bsicons::bs_icon("people-fill"),
+  theme = "primary"
+)
+```
+
+```{r}
+bslib::value_box(
+  title = "Colectivo",
+  value = textOutput("vb_colectivo"),
+  showcase = bsicons::bs_icon("bus-front-fill"),
+  theme = "light"
+)
+```
+
+```{r}
+bslib::value_box(
+  title = "Tren",
+  value = textOutput("vb_tren"),
+  showcase = bsicons::bs_icon("train-front-fill"),
+  theme = "light"
+)
+```
+
+```{r}
+bslib::value_box(
+  title = "Subte",
+  value = textOutput("vb_subte"),
+  showcase = bsicons::bs_icon("train-lightrail-front-fill"),
+  theme = "light"
+)
+```
+
+## Row {height="65%"}
+
+### Column {width="55%"}
+
+```{r}
+#| title: "El colectivo concentra la mayoría de los viajes (promedio móvil de 7 días)"
+plotlyOutput("grafico_lineas", height = "100%")
+```
+
+### Column {width="45%"}
+
+```{r}
+#| title: "Los días hábiles concentran más viajes (línea punteada = promedio)"
+plotlyOutput("grafico_cajas", height = "100%")
+```
+
+# Detalle
+
+## Row
+
+```{r}
+#| title: "Base de datos diaria de viajes SUBE - AMBA"
+DT::DTOutput("tabla")
+```
+
+```{r}
+#| context: server
+
+# ---- Datos filtrados: se recalculan cada vez que se mueve un filtro ----
+datos_f <- reactive({
+  req(input$rango)
+  dias_sel <- if (length(input$dias) == 0) dias else input$dias   # vacío = todos
+  datos %>%
+    filter(
+      fecha >= input$rango[1],
+      fecha <= input$rango[2],
+      dia_semana_lbl %in% dias_sel
+    )
+})
+
+# ---- Tarjetas ----
+output$vb_total     <- renderText(fmt_es(sum(datos_f()$total_viajes,   na.rm = TRUE)))
+output$vb_colectivo <- renderText(fmt_es(sum(datos_f()$colectivo_amba, na.rm = TRUE)))
+output$vb_tren      <- renderText(fmt_es(sum(datos_f()$tren_amba,      na.rm = TRUE)))
+output$vb_subte     <- renderText(fmt_es(sum(datos_f()$subte_amba,     na.rm = TRUE)))
+
+# ---- Gráfico de líneas ----
+output$grafico_lineas <- renderPlotly({
+  plot_ly(datos_f(), x = ~fecha) %>%
+    add_lines(y = ~col_ma7,   name = "Colectivo", line = list(color = "#0d6efd", width = 2.5)) %>%
+    add_lines(y = ~tren_ma7,  name = "Tren",      line = list(color = "#d97706", width = 2)) %>%
+    add_lines(y = ~subte_ma7, name = "Subte",     line = list(color = "#7c3aed", width = 2)) %>%
+    layout(
+      xaxis = list(title = "", showgrid = FALSE),
+      yaxis = list(
+        title = "",
+        tickvals = c(0, 1e6, 2e6, 3e6),
+        ticktext = c("0", "1 M", "2 M", "3 M"),
+        gridcolor = "#f1f5f9"
+      ),
+      legend = list(orientation = "h", x = 0.3, y = -0.15),
+      shapes = list(
+        list(
+          type = "rect",
+          x0 = "2020-03-20", x1 = "2020-06-30",
+          y0 = 0, y1 = 1, yref = "paper",
+          fillcolor = "rgba(148, 163, 184, 0.2)",
+          line = list(width = 0)
+        )
+      ),
+      annotations = list(
+        list(
+          x = "2020-05-10", y = 1500000,
+          text = "Cuarentena 2020",
+          showarrow = FALSE,
+          xanchor = "left",
+          font = list(size = 11, color = "#64748b")
+        )
+      ),
+      margin = list(t = 10, b = 40)
+    ) %>%
+    config(displayModeBar = FALSE)
+})
+
+# ---- Gráfico de cajas ----
+output$grafico_cajas <- renderPlotly({
+  plot_ly(
+    datos_f(),
+    x = ~dia_semana_lbl,
+    y = ~total_viajes,
+    type = "box",
+    boxmean = TRUE,
+    fillcolor = "#cbd5e1",
+    line = list(color = "#334155", width = 1.5),
+    marker = list(opacity = 0),
+    showlegend = FALSE
+  ) %>%
+    layout(
+      xaxis = list(
+        title = "Millones de viajes por día (todos los modos)",
+        showgrid = FALSE,
+        categoryorder = "array",
+        categoryarray = dias
+      ),
+      yaxis = list(
+        title = "",
+        tickvals = c(0, 1e6, 2e6, 3e6, 4e6, 5e6),
+        ticktext = c("0", "1", "2", "3", "4", "5"),
+        gridcolor = "#f1f5f9"
+      ),
+      margin = list(t = 10, b = 40)
+    ) %>%
+    config(displayModeBar = FALSE)
+})
+
+# ---- Tabla ----
+output$tabla <- DT::renderDT({
+  d <- datos_f()
+  nombres <- c("Colectivo", "Subte", "Tren", "Año", "Mes", "Día (Núm)",
+               "Día de la semana", "Fecha", "Total Diario",
+               "Col MA7", "Tren MA7", "Subte MA7")
+  # Solo renombra si la cantidad de columnas coincide
+  cn <- if (ncol(d) == length(nombres)) nombres else colnames(d)
+  DT::datatable(
+    d,
+    colnames = cn,
+    options = list(pageLength = 15, dom = "frtip"),
+    rownames = FALSE
+  )
+})
+```
