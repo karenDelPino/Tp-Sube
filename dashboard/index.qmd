@@ -1,208 +1,539 @@
 ---
 title: "Movilidad SUBE - AMBA"
 author: "Valentina Barroso y Karen Del Pino"
-format: 
+format:
   dashboard:
     orientation: rows
-    scrolling: false
+    scrolling: true
     theme: cosmo
     css: styles.css
 execute:
   echo: false
   warning: false
+  message: false
 ---
 
 ```{r}
 #| label: setup
 library(tidyverse)
-library(scales)
-library(crosstalk)
 library(plotly)
+library(DT)
 
-# 1. Leemos los datos
-datos <- read_csv("../datos/procesados/dataset_sube.csv")
+# ===================================================================
+# 1. DATOS
+# ===================================================================
+# Archivo generado por scripts/descarga.sh.
+# Los valores son USUARIOS por día (no viajes).
+# total_amba = usuarios únicos: quien usa dos modos el mismo día cuenta una vez.
+datos <- read_csv("../datos/procesados/dataset_sube.csv", show_col_types = FALSE)
 
-# 2. Preparamos días, fecha, total diario y promedio móvil de 7 días
-dias <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+dias  <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
+meses <- c("Ene", "Feb", "Mar", "Abr", "May", "Jun",
+           "Jul", "Ago", "Sep", "Oct", "Nov", "Dic")
 
 datos <- datos %>%
   mutate(
+    fecha = as.Date(fecha),
     dia_semana_lbl = factor(dias[dia_semana + 1], levels = dias),
-    fecha = seq.Date(from = as.Date("2020-01-01"), by = "day", length.out = n()),
-    total_viajes = colectivo_amba + tren_amba + subte_amba,
-    # Promedio móvil de 7 días para suavizar las líneas igual al mockup
-    col_ma7 = as.numeric(stats::filter(colectivo_amba, rep(1/7, 7), sides = 1)),
-    tren_ma7 = as.numeric(stats::filter(tren_amba, rep(1/7, 7), sides = 1)),
-    subte_ma7 = as.numeric(stats::filter(subte_amba, rep(1/7, 7), sides = 1))
+    tipo_dia = if_else(dia_semana < 5, "Día hábil", "Fin de semana")
   )
 
-# 3. Objeto compartido para que los filtros controlen ambos gráficos
-sd <- SharedData$new(datos)
+# Promedio móvil de 7 días sobre el calendario completo:
+# los días que faltan en la fuente (ago 2022, ene 2024) quedan NA y la línea se corta.
+ma7 <- function(x) as.numeric(stats::filter(x, rep(1 / 7, 7), sides = 1))
+
+calendario <- datos %>%
+  select(fecha, colectivo_amba, tren_amba, subte_amba, total_amba) %>%
+  complete(fecha = seq(min(fecha), max(fecha), by = "day")) %>%
+  arrange(fecha) %>%
+  mutate(across(c(colectivo_amba, tren_amba, subte_amba, total_amba),
+                ma7, .names = "{.col}_ma7"))
+
+# Período de las tarjetas: los últimos 12 meses con datos
+ultima_fecha <- max(datos$fecha)
+ult_12  <- datos %>% filter(fecha >  ultima_fecha - 365)
+prev_12 <- datos %>% filter(fecha <= ultima_fecha - 365, fecha > ultima_fecha - 730)
+
+# ===================================================================
+# 2. FORMATO ARGENTINO
+# ===================================================================
+# Coma decimal y punto de miles. En Argentina "billón" es un millón de millones,
+# por eso nunca usamos "B": escribimos "millones" o "mil".
+num <- function(x, d = 0) formatC(x, format = "f", digits = d, big.mark = ".", decimal.mark = ",")
+
+fmt_usuarios <- function(x) {
+  if (x >= 1e6) paste(num(x / 1e6, 2), "millones") else paste(num(x / 1e3, 0), "mil")
+}
+fmt_pct <- function(x) paste0(if_else(x >= 0, "+", "−"), num(abs(100 * x), 1), " %")
+
+# ===================================================================
+# 3. CONFIGURACIÓN DE CADA MODO
+# ===================================================================
+# Colectivo se muestra en millones; tren y subte en miles (son más chicos).
+# Los colores son los del tema cosmo (primary, warning, info), así la tarjeta
+# de color y los gráficos de cada pestaña coinciden.
+modos <- list(
+  colectivo = list(col = "colectivo_amba", nombre = "Colectivo", color = "#2780e3", tarjeta = "primary",
+                   div = 1e6, unidad = "millones", dec = 2),
+  tren      = list(col = "tren_amba",      nombre = "Tren",      color = "#ff7518", tarjeta = "warning",
+                   div = 1e3, unidad = "mil",      dec = 0),
+  subte     = list(col = "subte_amba",     nombre = "Subte",     color = "#9954bb", tarjeta = "info",
+                   div = 1e3, unidad = "mil",      dec = 0)
+)
+
+eje_titulo <- function(m) if (m$div == 1e6) "Millones de usuarios por día" else "Miles de usuarios por día"
+formato_y  <- function(m) paste0(",.", m$dec, "f")              # números del hover
+formato_eje <- function(m) if (m$div == 1e6) ",.1f" else ",.0f"   # números del eje
+
+# Tarjetas de un modo
+kpis_modo <- function(m) {
+  v_ult  <- ult_12[[m$col]]
+  v_prev <- prev_12[[m$col]]
+  list(
+    promedio = fmt_usuarios(mean(v_ult)),
+    habil    = fmt_usuarios(mean(v_ult[ult_12$dia_semana < 5])),
+    finde    = fmt_usuarios(mean(v_ult[ult_12$dia_semana >= 5])),
+    variacion = fmt_pct(mean(v_ult) / mean(v_prev) - 1)
+  )
+}
+kpi <- map(modos, kpis_modo)
+
+# ===================================================================
+# 4. ESTILO COMÚN DE LOS GRÁFICOS
+# ===================================================================
+estilo <- function(p, ...) {
+  p %>%
+    layout(
+      separators = ",.",                       # coma decimal, punto de miles
+      font = list(family = "Inter, system-ui, sans-serif", size = 12, color = "#334155"),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor  = "rgba(0,0,0,0)",
+      margin = list(t = 30, r = 10, b = 40, l = 60),
+      ...
+    ) %>%
+    config(displayModeBar = FALSE, locale = "es-ar")
+}
+
+# Sombreado de la cuarentena estricta de 2020
+cuarentena_shape <- list(
+  type = "rect", x0 = "2020-03-20", x1 = "2020-06-30", xref = "x",
+  y0 = 0, y1 = 1, yref = "paper",
+  fillcolor = "rgba(148, 163, 184, 0.18)", line = list(width = 0), layer = "below"
+)
+cuarentena_texto <- list(
+  x = "2020-03-25", y = 1, xref = "x", yref = "paper", yanchor = "top", xanchor = "left",
+  text = "Cuarentena 2020", showarrow = FALSE, font = list(size = 11, color = "#64748b")
+)
+
+# FILTRO DE FECHAS (propio de Plotly): botones de período + barra deslizante
+eje_fechas <- list(
+  title = "",
+  showgrid = FALSE,
+  type = "date",
+  rangeselector = list(
+    x = 0, y = 1.08,
+    bgcolor = "#f1f5f9", activecolor = "#cbd5e1",
+    buttons = list(
+      list(count = 3, label = "3 meses", step = "month", stepmode = "backward"),
+      list(count = 1, label = "1 año",   step = "year",  stepmode = "backward"),
+      list(count = 3, label = "3 años",  step = "year",  stepmode = "backward"),
+      list(step = "all", label = "Todo")
+    )
+  ),
+  rangeslider = list(visible = TRUE, thickness = 0.07, bgcolor = "#f8fafc")
+)
+
+# ===================================================================
+# 5. GRÁFICOS DE CADA PESTAÑA
+# ===================================================================
+
+# 5.1 Evolución diaria con filtro de fechas
+grafico_evolucion <- function(m) {
+  d <- calendario %>%
+    transmute(fecha,
+              diario = .data[[m$col]] / m$div,
+              media  = .data[[paste0(m$col, "_ma7")]] / m$div)
+  hover <- paste0("%{x|%d/%m/%Y}<br>%{y:", formato_y(m), "} ", m$unidad, "<extra>%{fullData.name}</extra>")
+
+  plot_ly(d, x = ~fecha) %>%
+    add_lines(y = ~diario, name = "Valor diario", visible = "legendonly",
+              line = list(color = "#cbd5e1", width = 1), hovertemplate = hover) %>%
+    add_lines(y = ~media, name = "Promedio 7 días",
+              line = list(color = m$color, width = 2.5), hovertemplate = hover) %>%
+    estilo(
+      xaxis = eje_fechas,
+      yaxis = list(title = eje_titulo(m), gridcolor = "#eef2f7", rangemode = "tozero",
+                   tickformat = formato_eje(m)),
+      legend = list(orientation = "h", x = 1, xanchor = "right", y = 1.12),
+      shapes = list(cuarentena_shape),
+      annotations = list(cuarentena_texto),
+      hovermode = "x unified"
+    )
+}
+
+# 5.2 Boxplot por día de la semana, con filtro de AÑO (menú desplegable de Plotly).
+#     El filtro elige qué año se mira; los días siempre se ven todos para compararlos.
+grafico_dias <- function(m) {
+  anios <- sort(unique(datos$anio))
+  opciones <- c("Todos los años", "Sin 2020 (pandemia)", as.character(anios))
+  subconjunto <- function(op) {
+    if (op == "Todos los años") datos
+    else if (op == "Sin 2020 (pandemia)") filter(datos, anio != 2020)
+    else filter(datos, anio == as.integer(op))
+  }
+
+  p <- plot_ly()
+  for (i in seq_along(opciones)) {
+    d <- subconjunto(opciones[i])
+    p <- p %>% add_trace(
+      data = d, x = ~dia_semana_lbl, y = d[[m$col]] / m$div,
+      type = "box", name = opciones[i], visible = (i == 2),
+      boxmean = TRUE, boxpoints = FALSE,
+      fillcolor = paste0(m$color, "33"), line = list(color = m$color, width = 1.5),
+      hoverinfo = "y", showlegend = FALSE
+    )
+  }
+  botones <- map(seq_along(opciones), function(i) {
+    list(method = "restyle", label = opciones[i],
+         args = list("visible", as.list(seq_along(opciones) == i)))
+  })
+
+  p %>% estilo(
+    xaxis = list(title = "", showgrid = FALSE,
+                 categoryorder = "array", categoryarray = dias),
+    yaxis = list(title = eje_titulo(m), gridcolor = "#eef2f7", rangemode = "tozero",
+                 tickformat = formato_eje(m)),
+    updatemenus = list(list(
+      type = "dropdown", active = 1, buttons = botones,
+      x = 0, xanchor = "left", y = 1.16, yanchor = "top",
+      bgcolor = "#ffffff", bordercolor = "#cbd5e1", font = list(size = 12)
+    )),
+    margin = list(t = 50, r = 10, b = 40, l = 60)
+  )
+}
+
+# 5.3 Promedio diario por mes: una línea por año (se prenden/apagan desde la leyenda)
+grafico_mensual <- function(m) {
+  d <- datos %>%
+    group_by(anio, mes) %>%
+    summarise(valor = mean(.data[[m$col]]) / m$div, .groups = "drop") %>%
+    complete(anio, mes = 1:12) %>%                    # meses sin datos = hueco
+    mutate(mes_lbl = factor(meses[mes], levels = meses))
+  anios <- sort(unique(d$anio))
+  colores <- colorRampPalette(c("#b8c4d4", m$color))(length(anios))
+  hover <- paste0("%{x} %{fullData.name}<br>%{y:", formato_y(m), "} ", m$unidad, "<extra></extra>")
+
+  p <- plot_ly()
+  for (i in seq_along(anios)) {
+    p <- p %>% add_lines(
+      data = filter(d, anio == anios[i]), x = ~mes_lbl, y = ~valor,
+      name = as.character(anios[i]),
+      line = list(color = colores[i], width = if (i == length(anios)) 3 else 2),
+      connectgaps = FALSE, hovertemplate = hover
+    )
+  }
+  p %>% estilo(
+    xaxis = list(title = "", showgrid = FALSE),
+    yaxis = list(title = eje_titulo(m), gridcolor = "#eef2f7", rangemode = "tozero",
+                 tickformat = formato_eje(m)),
+    legend = list(title = list(text = "Año (click para ocultar)"), orientation = "v")
+  )
+}
 ```
 
 # Resumen
 
-## Row {height="130px"}
-
-### Column {width=60%}
-
-
-```{r}
-#| title: "Rango de fechas"
-filter_slider(
-  id = "filtro_fecha",
-  label = NULL,
-  sharedData = sd,
-  column = ~fecha,
-  step = 1,
-  width = "92%",
-  timeFormat = "%d/%m/%Y",
-  dragRange = TRUE
-)
-```
-
-### Column {width=40%}
-
-```{r}
-#| title: "Días de la semana"
-filter_select(
-  id = "filtro_dia",
-  label = NULL,
-  sharedData = sd,
-  group = ~dia_semana_lbl,
-  multiple = TRUE
-)
-```
-
-## Row {height="145px"}
+## Row {height="140px"}
 
 ```{r}
 #| content: valuebox
-#| title: "Total de viajes"
-list(
-  icon = "people-fill",
-  color = "primary",
-  value = label_number(scale = 1e-9, suffix = " B", accuracy = 0.01)(sum(datos$colectivo_amba + datos$tren_amba + datos$subte_amba, na.rm = TRUE))
-)
+#| title: "Total por día"
+list(icon = "people-fill", color = "primary",
+     value = fmt_usuarios(mean(ult_12$total_amba)))
 ```
 
 ```{r}
 #| content: valuebox
-#| title: "Colectivo"
-list(
-  icon = "bus-front-fill",
-  color = "light",
-  value = label_number(scale = 1e-9, suffix = " B", accuracy = 0.01)(sum(datos$colectivo_amba, na.rm = TRUE))
-)
+#| title: "Colectivo por día"
+list(icon = "bus-front-fill", color = "light",
+     value = fmt_usuarios(mean(ult_12$colectivo_amba)))
 ```
 
 ```{r}
 #| content: valuebox
-#| title: "Tren"
-list(
-  icon = "train-front-fill",
-  color = "light",
-  value = label_number(scale = 1e-9, suffix = " B", accuracy = 0.01)(sum(datos$tren_amba, na.rm = TRUE))
-)
+#| title: "Tren por día"
+list(icon = "train-front-fill", color = "light",
+     value = fmt_usuarios(mean(ult_12$tren_amba)))
 ```
 
 ```{r}
 #| content: valuebox
-#| title: "Subte"
-list(
-  icon = "train-lightrail-front-fill",
-  color = "light",
-  value = label_number(scale = 1e-6, suffix = " M", accuracy = 1)(sum(datos$subte_amba, na.rm = TRUE))
-)
+#| title: "Subte por día"
+list(icon = "train-lightrail-front-fill", color = "light",
+     value = fmt_usuarios(mean(ult_12$subte_amba)))
 ```
 
+## Row {height="40px"}
 
-## Row {height="65%"}
+::: {.periodo}
+Tarjetas: promedio diario de los últimos 12 meses (`r format(ultima_fecha - 364, "%d/%m/%Y")` al `r format(ultima_fecha, "%d/%m/%Y")`).
+:::
 
-### Column {width=55%}
+## Row {height="480px"}
+
+### Column {width="60%"}
 
 ```{r}
-#| title: "El colectivo concentra la mayoría de los viajes (promedio móvil de 7 días)"
-plot_ly(sd, x = ~fecha) %>%
-  add_lines(y = ~col_ma7, name = "Colectivo", line = list(color = "#0d6efd", width = 2.5)) %>%
-  add_lines(y = ~tren_ma7, name = "Tren", line = list(color = "#d97706", width = 2)) %>%
-  add_lines(y = ~subte_ma7, name = "Subte", line = list(color = "#7c3aed", width = 2)) %>%
-  layout(
-    xaxis = list(title = "", showgrid = FALSE),
-    yaxis = list(
-      title = "", 
-      tickvals = c(0, 1e6, 2e6, 3e6),
-      ticktext = c("0", "1 M", "2 M", "3 M"),
-      gridcolor = "#f1f5f9"
-    ),
-    legend = list(orientation = "h", x = 0.3, y = -0.15),
-    shapes = list(
-      list(
-        type = "rect",
-        x0 = "2020-03-20", x1 = "2020-06-30",
-        y0 = 0, y1 = 1, yref = "paper",
-        fillcolor = "rgba(148, 163, 184, 0.2)",
-        line = list(width = 0)
-      )
-    ),
-annotations = list(
-      list(
-        x = "2020-05-10", y = 1500000,
-        text = "Cuarentena 2020",
-        showarrow = FALSE,
-        xanchor = "left",
-        font = list(size = 11, color = "#64748b")
-      )
-    ),
-    margin = list(t = 10, b = 40)
-  ) %>%
-  config(displayModeBar = FALSE)
+#| title: "El colectivo concentra la mayoría de los usuarios (promedio de 7 días)"
+hover_res <- "%{y:,.2f} millones<extra>%{fullData.name}</extra>"
+plot_ly(calendario, x = ~fecha) %>%
+  add_lines(y = ~colectivo_amba_ma7 / 1e6, name = "Colectivo",
+            line = list(color = modos$colectivo$color, width = 2.5), hovertemplate = hover_res) %>%
+  add_lines(y = ~tren_amba_ma7 / 1e6, name = "Tren",
+            line = list(color = modos$tren$color, width = 2), hovertemplate = hover_res) %>%
+  add_lines(y = ~subte_amba_ma7 / 1e6, name = "Subte",
+            line = list(color = modos$subte$color, width = 2), hovertemplate = hover_res) %>%
+  estilo(
+    xaxis = eje_fechas,
+    yaxis = list(title = "Millones de usuarios por día", gridcolor = "#eef2f7",
+                 rangemode = "tozero", tickformat = ",.1f"),
+    legend = list(orientation = "h", x = 1, xanchor = "right", y = 1.12),
+    shapes = list(cuarentena_shape),
+    annotations = list(cuarentena_texto),
+    hovermode = "x unified"
+  )
 ```
 
-### Column {width=45%}
+### Column {width="40%"}
 
 ```{r}
-#| title: "Los días hábiles concentran más viajes (línea punteada = promedio)"
-plot_ly(
-  sd, 
-  x = ~dia_semana_lbl, 
-  y = ~total_viajes,
-  type = "box",
-  boxmean = TRUE, # Dibuja automáticamente la línea punteada del promedio
-  fillcolor = "#cbd5e1",
-  line = list(color = "#334155", width = 1.5),
-  marker = list(opacity = 0), # Oculta puntos sueltos para que quede limpio como el mockup
-  showlegend = FALSE
-) %>%
-  layout(
-    xaxis = list(title = "Millones de viajes por día (todos los modos)", showgrid = FALSE),
-    yaxis = list(
-      title = "",
-      tickvals = c(0, 1e6, 2e6, 3e6, 4e6, 5e6),
-      ticktext = c("0", "1", "2", "3", "4", "5"),
-      gridcolor = "#f1f5f9"
-    ),
-    margin = list(t = 10, b = 40)
-  ) %>%
-  config(displayModeBar = FALSE)
+#| title: "Recuperación después de la pandemia: promedio diario por año"
+por_anio <- datos %>%
+  group_by(anio) %>%
+  summarise(across(c(colectivo_amba, tren_amba, subte_amba), mean), dias = n()) %>%
+  mutate(anio_lbl = if_else(anio == max(anio), paste0(anio, "*"), as.character(anio)))
+
+hover_anio <- "%{x}<br>%{y:,.2f} millones<extra>%{fullData.name}</extra>"
+plot_ly(por_anio, x = ~anio_lbl) %>%
+  add_bars(y = ~colectivo_amba / 1e6, name = "Colectivo",
+           marker = list(color = modos$colectivo$color), hovertemplate = hover_anio) %>%
+  add_bars(y = ~tren_amba / 1e6, name = "Tren",
+           marker = list(color = modos$tren$color), hovertemplate = hover_anio) %>%
+  add_bars(y = ~subte_amba / 1e6, name = "Subte",
+           marker = list(color = modos$subte$color), hovertemplate = hover_anio) %>%
+  estilo(
+    barmode = "group",
+    xaxis = list(title = "", type = "category"),
+    yaxis = list(title = "Millones de usuarios por día", gridcolor = "#eef2f7", tickformat = ",.1f"),
+    legend = list(orientation = "h", x = 1, xanchor = "right", y = 1.12),
+    annotations = list(list(
+      x = 1, y = -0.12, xref = "paper", yref = "paper", xanchor = "right", showarrow = FALSE,
+      text = paste0("* ", max(por_anio$anio), " hasta el ", format(ultima_fecha, "%d/%m")),
+      font = list(size = 11, color = "#64748b")
+    ))
+  )
 ```
 
+# Colectivo
 
-# Detalle
+## Row {height="140px"}
+
+```{r}
+#| content: valuebox
+#| title: "Promedio por día"
+list(icon = "bus-front-fill", color = modos$colectivo$tarjeta, value = kpi$colectivo$promedio)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Día hábil (lun a vie)"
+list(icon = "briefcase", color = "light", value = kpi$colectivo$habil)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Fin de semana (sáb y dom)"
+list(icon = "sun", color = "light", value = kpi$colectivo$finde)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Variación vs. 12 meses previos"
+list(icon = "graph-up-arrow", color = "light", value = kpi$colectivo$variacion)
+```
+
+## Row {height="40px"}
+
+::: {.periodo}
+Tarjetas: promedio diario de los últimos 12 meses (`r format(ultima_fecha - 364, "%d/%m/%Y")` al `r format(ultima_fecha, "%d/%m/%Y")`).
+:::
+
+## Row {height="480px"}
+
+### Column {width="60%"}
+
+```{r}
+#| title: "¿Cómo evolucionó? Usá los botones o la barra de abajo para elegir el período"
+grafico_evolucion(modos$colectivo)
+```
+
+### Column {width="40%"}
+
+```{r}
+#| title: "¿Qué días se usa más? Elegí el año en el menú (línea punteada = promedio)"
+grafico_dias(modos$colectivo)
+```
+
+## Row {height="400px"}
+
+```{r}
+#| title: "¿Cambia según el mes? Promedio diario por mes, una línea por año"
+grafico_mensual(modos$colectivo)
+```
+
+# Tren
+
+## Row {height="140px"}
+
+```{r}
+#| content: valuebox
+#| title: "Promedio por día"
+list(icon = "train-front-fill", color = modos$tren$tarjeta, value = kpi$tren$promedio)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Día hábil (lun a vie)"
+list(icon = "briefcase", color = "light", value = kpi$tren$habil)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Fin de semana (sáb y dom)"
+list(icon = "sun", color = "light", value = kpi$tren$finde)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Variación vs. 12 meses previos"
+list(icon = "graph-up-arrow", color = "light", value = kpi$tren$variacion)
+```
+
+## Row {height="40px"}
+
+::: {.periodo}
+Tarjetas: promedio diario de los últimos 12 meses (`r format(ultima_fecha - 364, "%d/%m/%Y")` al `r format(ultima_fecha, "%d/%m/%Y")`).
+:::
+
+## Row {height="480px"}
+
+### Column {width="60%"}
+
+```{r}
+#| title: "¿Cómo evolucionó? Usá los botones o la barra de abajo para elegir el período"
+grafico_evolucion(modos$tren)
+```
+
+### Column {width="40%"}
+
+```{r}
+#| title: "¿Qué días se usa más? Elegí el año en el menú (línea punteada = promedio)"
+grafico_dias(modos$tren)
+```
+
+## Row {height="400px"}
+
+```{r}
+#| title: "¿Cambia según el mes? Promedio diario por mes, una línea por año"
+grafico_mensual(modos$tren)
+```
+
+# Subte
+
+## Row {height="140px"}
+
+```{r}
+#| content: valuebox
+#| title: "Promedio por día"
+list(icon = "train-lightrail-front-fill", color = modos$subte$tarjeta, value = kpi$subte$promedio)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Día hábil (lun a vie)"
+list(icon = "briefcase", color = "light", value = kpi$subte$habil)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Fin de semana (sáb y dom)"
+list(icon = "sun", color = "light", value = kpi$subte$finde)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Variación vs. 12 meses previos"
+list(icon = "graph-up-arrow", color = "light", value = kpi$subte$variacion)
+```
+
+## Row {height="40px"}
+
+::: {.periodo}
+Tarjetas: promedio diario de los últimos 12 meses (`r format(ultima_fecha - 364, "%d/%m/%Y")` al `r format(ultima_fecha, "%d/%m/%Y")`).
+:::
+
+## Row {height="480px"}
+
+### Column {width="60%"}
+
+```{r}
+#| title: "¿Cómo evolucionó? Usá los botones o la barra de abajo para elegir el período"
+grafico_evolucion(modos$subte)
+```
+
+### Column {width="40%"}
+
+```{r}
+#| title: "¿Qué días se usa más? Elegí el año en el menú (línea punteada = promedio)"
+grafico_dias(modos$subte)
+```
+
+## Row {height="400px"}
+
+```{r}
+#| title: "¿Cambia según el mes? Promedio diario por mes, una línea por año"
+grafico_mensual(modos$subte)
+```
+
+# Datos {scrolling="false"}
 
 ## Row
 
-
 ```{r}
-#| title: "Base de datos diaria de viajes SUBE - AMBA"
-# Si no tenés instalado DT, podés correr install.packages("DT") en la consola
-DT::datatable(
-  sd,
-  colnames = c("Colectivo", "Subte", "Tren", "Año", "Mes", "Día (Núm)", "Día de la semana", "Fecha", "Total Diario", "Col MA7", "Tren MA7", "Subte MA7"),
-  options = list(
-    pageLength = 15,
-    dom = "Bfrtip"
-  ),
-  rownames = FALSE
-)
+#| title: "Usuarios por día - SUBE AMBA"
+datos %>%
+  arrange(desc(fecha)) %>%
+  transmute(
+    Fecha = format(fecha, "%d/%m/%Y"),
+    `Día` = dia_semana_lbl,
+    Colectivo = colectivo_amba,
+    Tren = tren_amba,
+    Subte = subte_amba,
+    `Total (usuarios únicos)` = total_amba
+  ) %>%
+  datatable(
+    rownames = FALSE,
+    options = list(
+      pageLength = 15,
+      dom = "frtip",
+      language = list(
+        search = "Buscar:",
+        info = "Mostrando _START_ a _END_ de _TOTAL_ días",
+        infoFiltered = "(filtrado de _MAX_)",
+        zeroRecords = "No hay resultados",
+        paginate = list(previous = "Anterior", `next` = "Siguiente")
+      )
+    )
+  ) %>%
+  formatRound(columns = 3:6, digits = 0, mark = ".", dec.mark = ",")
 ```

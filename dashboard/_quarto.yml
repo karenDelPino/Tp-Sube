@@ -1,21 +1,21 @@
 project:
   type: website
+  # GitHub Pages publica desde la carpeta /docs de la rama main
+  output-dir: ../docs
 
 website:
-  title: "quarto_dashboard"
+  title: "Movilidad SUBE - AMBA"
   favicon: logoSube.png
   navbar:
     left:
       - href: index.qmd
-        text: Home
-      - about.qmd
+        text: Dashboard
+      - href: about.qmd
+        text: Acerca de
+
 format:
   html:
-    theme:
-      - cosmo
-      - brand
+    theme: cosmo
     css: styles.css
-    toc: true
 
 editor: visual
-
