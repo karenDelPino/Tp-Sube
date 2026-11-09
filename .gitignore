@@ -8,3 +8,13 @@
 .quarto/
 *_files/
 *.html
+# Archivos del sistema
+desktop.ini
+Thumbs.db
+
+# Salida vieja del sitio (ahora se publica en /docs)
+dashboard/_site/
+
+# El sitio publicado en GitHub Pages SÍ se sube (incluye sus .html)
+!docs/
+!docs/**

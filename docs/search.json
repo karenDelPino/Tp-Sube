@@ -1,0 +1,23 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "Acerca de",
+    "section": "",
+    "text": "Autoras: Valentina Barroso y Karen Del Pino."
+  },
+  {
+    "objectID": "about.html#datos",
+    "href": "about.html#datos",
+    "title": "Acerca de",
+    "section": "Datos",
+    "text": "Datos\nUsamos el conjunto de datos abiertos Total de usuarios por día en el AMBA del Ministerio de Transporte de la Nación (tarjeta SUBE), desde el 1 de enero de 2020.\n\nLos valores son usuarios por día, no viajes: una persona que viaja varias veces en colectivo el mismo día cuenta una sola vez.\nTotal son usuarios únicos. Es menor que colectivo + tren + subte, porque quien combina dos modos el mismo día aparece en los dos modos, pero una sola vez en el total.\nLa fuente no tiene datos de agosto de 2022 ni de enero de 2024. Por eso las líneas del gráfico se cortan en esos meses."
+  },
+  {
+    "objectID": "about.html#cómo-leer-el-dashboard",
+    "href": "about.html#cómo-leer-el-dashboard",
+    "title": "Acerca de",
+    "section": "Cómo leer el dashboard",
+    "text": "Cómo leer el dashboard\n\nLos filtros de fecha y día de la semana cambian los gráficos y la tabla.\nLas tarjetas muestran el promedio diario de todo el período (no cambian con los filtros).\nLa pestaña Detalle tiene la tabla día por día.\n\nCódigo y datos: github.com/karenDelPino/Tp-Sube"
+  }
+]

@@ -1,9 +1,25 @@
 ---
-title: "About"
+title: "Acerca de"
 ---
 
-About this site
+**Autoras:** Valentina Barroso y Karen Del Pino.
 
-```{r}
-1 + 1
-```
+## Datos
+
+Usamos el conjunto de datos abiertos *Total de usuarios por día en el AMBA* del
+Ministerio de Transporte de la Nación (tarjeta SUBE), desde el 1 de enero de 2020.
+
+- Los valores son **usuarios por día**, no viajes: una persona que viaja varias
+  veces en colectivo el mismo día cuenta una sola vez.
+- **Total** son usuarios únicos. Es menor que colectivo + tren + subte, porque quien
+  combina dos modos el mismo día aparece en los dos modos, pero una sola vez en el total.
+- La fuente no tiene datos de **agosto de 2022** ni de **enero de 2024**. Por eso las
+  líneas del gráfico se cortan en esos meses.
+
+## Cómo leer el dashboard
+
+- Los filtros de fecha y día de la semana cambian los gráficos y la tabla.
+- Las tarjetas muestran el promedio diario de todo el período (no cambian con los filtros).
+- La pestaña **Detalle** tiene la tabla día por día.
+
+Código y datos: [github.com/karenDelPino/Tp-Sube](https://github.com/karenDelPino/Tp-Sube)

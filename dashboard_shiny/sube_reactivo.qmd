@@ -22,27 +22,42 @@ library(bslib)
 library(bsicons)
 library(DT)
 
-# 1. Leemos los datos (ruta local, sin "../")
-datos <- read_csv("datos/procesados/dataset_sube.csv", show_col_types = FALSE)
+# 1. Leemos los datos procesados por scripts/descarga.sh (carpeta datos/ de la raíz).
+#    Los valores son USUARIOS por día (no viajes).
+#    total_amba = usuarios únicos (quien usa dos modos el mismo día cuenta una vez).
+datos <- read_csv("../datos/procesados/dataset_sube.csv", show_col_types = FALSE)
 
-# 2. Preparamos días, fecha, total diario y promedio móvil de 7 días
+# 2. Preparamos días, fecha real y promedio móvil de 7 días
 dias <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
 
 datos <- datos %>%
   mutate(
-    dia_semana_lbl = factor(dias[dia_semana + 1], levels = dias),
-    fecha = seq.Date(from = as.Date("2020-01-01"), by = "day", length.out = n()),
-    total_viajes = colectivo_amba + tren_amba + subte_amba,
-    col_ma7   = as.numeric(stats::filter(colectivo_amba, rep(1/7, 7), sides = 1)),
-    tren_ma7  = as.numeric(stats::filter(tren_amba,      rep(1/7, 7), sides = 1)),
-    subte_ma7 = as.numeric(stats::filter(subte_amba,     rep(1/7, 7), sides = 1))
+    fecha = as.Date(fecha),   # fecha REAL del archivo (la fuente tiene meses faltantes)
+    dia_semana_lbl = factor(dias[dia_semana + 1], levels = dias)
   )
 
-# 3. Formato en español: millones con punto de miles (7.713 M = 7.713 millones)
+# Promedio móvil sobre el calendario completo: los días que faltan quedan NA,
+# así no se mezclan días de meses distintos y la línea se corta en el hueco.
+ma7 <- function(x) as.numeric(stats::filter(x, rep(1 / 7, 7), sides = 1))
+
+medias_moviles <- datos %>%
+  complete(fecha = seq(min(fecha), max(fecha), by = "day")) %>%
+  arrange(fecha) %>%
+  transmute(fecha,
+            col_ma7   = ma7(colectivo_amba),
+            tren_ma7  = ma7(tren_amba),
+            subte_ma7 = ma7(subte_amba))
+
+datos <- datos %>%
+  left_join(medias_moviles, by = "fecha") %>%
+  select(fecha, dia_semana_lbl, colectivo_amba, tren_amba, subte_amba, total_amba,
+         anio, mes, dia_semana, col_ma7, tren_ma7, subte_ma7)
+
+# 3. Formato en español: 2,69 M = 2,69 millones
 fmt_es <- function(x) {
   if (is.na(x) || x == 0) return("0")
   if (x >= 1e6) {
-    paste0(format(round(x / 1e6, 1), big.mark = ".", decimal.mark = ","), " M")
+    paste0(format(round(x / 1e6, 2), nsmall = 2, big.mark = ".", decimal.mark = ","), " M")
   } else {
     format(round(x), big.mark = ".", decimal.mark = ",")
   }
@@ -85,7 +100,7 @@ checkboxGroupInput(
 
 ```{r}
 bslib::value_box(
-  title = "Total de viajes",
+  title = "Total · usuarios por día",
   value = textOutput("vb_total"),
   showcase = bsicons::bs_icon("people-fill"),
   theme = "primary"
@@ -94,7 +109,7 @@ bslib::value_box(
 
 ```{r}
 bslib::value_box(
-  title = "Colectivo",
+  title = "Colectivo · usuarios por día",
   value = textOutput("vb_colectivo"),
   showcase = bsicons::bs_icon("bus-front-fill"),
   theme = "light"
@@ -103,7 +118,7 @@ bslib::value_box(
 
 ```{r}
 bslib::value_box(
-  title = "Tren",
+  title = "Tren · usuarios por día",
   value = textOutput("vb_tren"),
   showcase = bsicons::bs_icon("train-front-fill"),
   theme = "light"
@@ -112,7 +127,7 @@ bslib::value_box(
 
 ```{r}
 bslib::value_box(
-  title = "Subte",
+  title = "Subte · usuarios por día",
   value = textOutput("vb_subte"),
   showcase = bsicons::bs_icon("train-lightrail-front-fill"),
   theme = "light"
@@ -124,14 +139,14 @@ bslib::value_box(
 ### Column {width="55%"}
 
 ```{r}
-#| title: "El colectivo concentra la mayoría de los viajes (promedio móvil de 7 días)"
+#| title: "El colectivo concentra la mayoría de los usuarios (promedio móvil de 7 días)"
 plotlyOutput("grafico_lineas", height = "100%")
 ```
 
 ### Column {width="45%"}
 
 ```{r}
-#| title: "Los días hábiles concentran más viajes (línea punteada = promedio)"
+#| title: "Los días hábiles concentran más usuarios (línea punteada = promedio)"
 plotlyOutput("grafico_cajas", height = "100%")
 ```
 
@@ -140,7 +155,7 @@ plotlyOutput("grafico_cajas", height = "100%")
 ## Row
 
 ```{r}
-#| title: "Base de datos diaria de viajes SUBE - AMBA"
+#| title: "Base de datos diaria de usuarios SUBE - AMBA"
 DT::DTOutput("tabla")
 ```
 
@@ -159,11 +174,12 @@ datos_f <- reactive({
     )
 })
 
-# ---- Tarjetas ----
-output$vb_total     <- renderText(fmt_es(sum(datos_f()$total_viajes,   na.rm = TRUE)))
-output$vb_colectivo <- renderText(fmt_es(sum(datos_f()$colectivo_amba, na.rm = TRUE)))
-output$vb_tren      <- renderText(fmt_es(sum(datos_f()$tren_amba,      na.rm = TRUE)))
-output$vb_subte     <- renderText(fmt_es(sum(datos_f()$subte_amba,     na.rm = TRUE)))
+# ---- Tarjetas: promedio diario de usuarios en el período filtrado ----
+# (se promedia porque sumar usuarios de muchos días no tiene sentido)
+output$vb_total     <- renderText(fmt_es(mean(datos_f()$total_amba,     na.rm = TRUE)))
+output$vb_colectivo <- renderText(fmt_es(mean(datos_f()$colectivo_amba, na.rm = TRUE)))
+output$vb_tren      <- renderText(fmt_es(mean(datos_f()$tren_amba,      na.rm = TRUE)))
+output$vb_subte     <- renderText(fmt_es(mean(datos_f()$subte_amba,     na.rm = TRUE)))
 
 # ---- Gráfico de líneas ----
 output$grafico_lineas <- renderPlotly({
@@ -174,9 +190,9 @@ output$grafico_lineas <- renderPlotly({
     layout(
       xaxis = list(title = "", showgrid = FALSE),
       yaxis = list(
-        title = "",
-        tickvals = c(0, 1e6, 2e6, 3e6),
-        ticktext = c("0", "1 M", "2 M", "3 M"),
+        title = "Usuarios por día",
+        tickvals = c(0, 1e6, 2e6, 3e6, 4e6),
+        ticktext = c("0", "1 M", "2 M", "3 M", "4 M"),
         gridcolor = "#f1f5f9"
       ),
       legend = list(orientation = "h", x = 0.3, y = -0.15),
@@ -208,7 +224,7 @@ output$grafico_cajas <- renderPlotly({
   plot_ly(
     datos_f(),
     x = ~dia_semana_lbl,
-    y = ~total_viajes,
+    y = ~total_amba,   # usuarios únicos del día, todos los modos
     type = "box",
     boxmean = TRUE,
     fillcolor = "#cbd5e1",
@@ -218,13 +234,13 @@ output$grafico_cajas <- renderPlotly({
   ) %>%
     layout(
       xaxis = list(
-        title = "Millones de viajes por día (todos los modos)",
+        title = "",
         showgrid = FALSE,
         categoryorder = "array",
         categoryarray = dias
       ),
       yaxis = list(
-        title = "",
+        title = "Millones de usuarios por día (todos los modos)",
         tickvals = c(0, 1e6, 2e6, 3e6, 4e6, 5e6),
         ticktext = c("0", "1", "2", "3", "4", "5"),
         gridcolor = "#f1f5f9"
@@ -237,16 +253,13 @@ output$grafico_cajas <- renderPlotly({
 # ---- Tabla ----
 output$tabla <- DT::renderDT({
   d <- datos_f()
-  nombres <- c("Colectivo", "Subte", "Tren", "Año", "Mes", "Día (Núm)",
-               "Día de la semana", "Fecha", "Total Diario",
-               "Col MA7", "Tren MA7", "Subte MA7")
-  # Solo renombra si la cantidad de columnas coincide
-  cn <- if (ncol(d) == length(nombres)) nombres else colnames(d)
   DT::datatable(
-    d,
-    colnames = cn,
+    d %>% select(fecha, dia_semana_lbl, colectivo_amba, tren_amba, subte_amba, total_amba),
+    colnames = c("Fecha", "Día de la semana", "Colectivo", "Tren", "Subte",
+                 "Total (usuarios únicos)"),
     options = list(pageLength = 15, dom = "frtip"),
     rownames = FALSE
-  )
+  ) %>%
+    DT::formatRound(columns = 3:6, digits = 0, mark = ".", dec.mark = ",")
 })
 ```

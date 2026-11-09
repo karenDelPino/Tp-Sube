@@ -21,4 +21,6 @@ quarto::quarto_serve("sube_reactivo.qmd")
 
 3. Abrí en el navegador la dirección que aparece (http://127.0.0.1:XXXX).
 
+Los datos se leen de `../datos/procesados/dataset_sube.csv` (la carpeta `datos` de la raíz del proyecto), así que no hace falta copiar el CSV acá. Si no existe, primero corré `bash scripts/descarga.sh` desde la raíz.
+
 Nota: al usar Shiny, el dashboard necesita R ejecutándose y no se puede publicar en GitHub Pages.
