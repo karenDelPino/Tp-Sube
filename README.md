@@ -12,7 +12,8 @@ con la cantidad de **usuarios por día** de colectivo, tren y subte en el AMBA, 
 enero de 2020. Buscamos responder cómo se usa cada modo de transporte, cómo cambia el uso
 entre días hábiles y fines de semana, y cómo evolucionó desde la cuarentena de 2020.
 Hicimos un análisis exploratorio en R (medidas de posición, histogramas, boxplots y
-tablas de frecuencia) y un dashboard interactivo con Quarto.
+tablas de frecuencia) y un dashboard interactivo con Quarto y Plotly (pestañas Resumen,
+Colectivo, Tren, Subte y Datos).
 
 **Sobre los datos:**
 - Son *usuarios*, no viajes: una persona que viaja varias veces el mismo día en
@@ -28,8 +29,7 @@ tablas de frecuencia) y un dashboard interactivo con Quarto.
 │   └── procesados/      # dataset_sube.csv, limpio (con fecha real)
 ├── scripts/             # descarga.sh: descarga y limpieza
 ├── reportes/            # sube-R.qmd: análisis exploratorio (PDF)
-├── dashboard/           # dashboard estático (crosstalk), se publica en GitHub Pages
-├── dashboard_shiny/     # versión con Shiny (necesita R, no va a GitHub Pages)
+├── dashboard/           # dashboard con Quarto + Plotly, se publica en GitHub Pages
 └── docs/                # sitio renderizado que publica GitHub Pages (no editar a mano)
 ```
 
@@ -42,9 +42,7 @@ tablas de frecuencia) y un dashboard interactivo con Quarto.
 2. Abrir `Tp-sube.Rproj` en RStudio.
 3. Instalar las dependencias (una sola vez):
    ```r
-   install.packages(c("tidyverse", "scales", "here", "plotly", "crosstalk", "DT"))
-   # Solo para la versión Shiny:
-   install.packages(c("shiny", "bslib", "bsicons", "quarto"))
+   install.packages(c("tidyverse", "scales", "here", "plotly", "DT"))
    ```
 4. Descargar y limpiar los datos (desde la raíz del proyecto; necesita `curl` o `wget` y `python3`):
    ```bash

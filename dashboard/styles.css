@@ -30,32 +30,35 @@ body {
   padding: 6px 16px 8px 16px !important;
 }
 
-/* Asegurar que el menú desplegable de días pase por encima de los KPIs */
-.bslib-grid > :first-child, .dashboard-row:first-of-type {
-  z-index: 1050 !important;
-}
-
-.selectize-dropdown {
-  z-index: 9999 !important;
-}
-
 /* Ocultar el botón flotante de expandir tarjeta */
 bslib-tooltip, .bslib-full-screen-enter {
   display: none !important;
 }
 
-/* Compactar SOLAMENTE los controles de filtro (sin tocar los gráficos) */
-.crosstalk-input-slider {
-  width: 90% !important;
-  margin: 4px auto 0 auto !important;
-  padding: 0 10px !important;
+/* Números de las tarjetas: un poco más chicos para que entre "2,69 millones" */
+.value-box-value {
+  font-size: 1.55rem !important;
+  white-space: nowrap;
 }
 
-.irs--shiny {
-height: 52px !important;
-  margin-top: 2px !important;
+/* Texto que aclara el período de las tarjetas */
+.periodo {
+  font-size: 0.85rem;
+  color: #64748b;
+  padding: 0 4px;
+}
+.periodo code {
+  color: inherit;
+  background: none;
+  padding: 0;
 }
 
-.form-group, .crosstalk-input {
-  margin-bottom: 0 !important;
+/* Menú desplegable de Plotly (filtro de año) por encima del gráfico */
+.js-plotly-plot .updatemenu-container {
+  cursor: pointer;
+}
+
+/* Íconos de las tarjetas más chicos para dejar lugar al número */
+.value-box-showcase .bi {
+  font-size: 2.4rem !important;
 }

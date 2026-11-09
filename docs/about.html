@@ -149,13 +149,23 @@ ul.task-list li input[type="checkbox"] {
 <li>La fuente no tiene datos de <strong>agosto de 2022</strong> ni de <strong>enero de 2024</strong>. Por eso las líneas del gráfico se cortan en esos meses.</li>
 </ul>
 </section>
-<section id="cómo-leer-el-dashboard" class="level2">
-<h2 class="anchored" data-anchor-id="cómo-leer-el-dashboard">Cómo leer el dashboard</h2>
+<section id="qué-muestra-cada-pestaña" class="level2">
+<h2 class="anchored" data-anchor-id="qué-muestra-cada-pestaña">Qué muestra cada pestaña</h2>
 <ul>
-<li>Los filtros de fecha y día de la semana cambian los gráficos y la tabla.</li>
-<li>Las tarjetas muestran el promedio diario de todo el período (no cambian con los filtros).</li>
-<li>La pestaña <strong>Detalle</strong> tiene la tabla día por día.</li>
+<li><strong>Resumen:</strong> cuántos usuarios tiene cada transporte y cómo se recuperó el uso después de la cuarentena de 2020.</li>
+<li><strong>Colectivo, Tren y Subte:</strong> para cada modo, tres preguntas:
+<ol type="1">
+<li><em>¿Cómo evolucionó?</em> Promedio de 7 días. Se filtra por fecha con los botones (3 meses, 1 año, 3 años, Todo) o con la barra de abajo del gráfico.</li>
+<li><em>¿Qué días se usa más?</em> Boxplot por día de la semana. Se filtra por año con el menú; la opción “Sin 2020” saca la pandemia, que deforma las cajas.</li>
+<li><em>¿Cambia según el mes?</em> Una línea por año. Haciendo click en la leyenda se ocultan o muestran años.</li>
+</ol></li>
+<li><strong>Datos:</strong> la tabla día por día, con buscador.</li>
 </ul>
+<p>Cada filtro afecta solo a su gráfico, así no se mezclan análisis distintos. Las tarjetas muestran el promedio diario de los últimos 12 meses con datos.</p>
+</section>
+<section id="escala" class="level2">
+<h2 class="anchored" data-anchor-id="escala">Escala</h2>
+<p>Usamos la escala argentina: coma decimal, punto de miles, y “millones” o “mil” (nunca “B”, porque en Argentina un billón es un millón de millones).</p>
 <p>Código y datos: <a href="https://github.com/karenDelPino/Tp-Sube">github.com/karenDelPino/Tp-Sube</a></p>
 
 
