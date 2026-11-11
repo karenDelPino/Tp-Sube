@@ -15,6 +15,7 @@ editor: visual
 ```{r}
 library(tidyverse)
 library(scales)
+library(here)
 ```
 
 ### Chunk 2:
@@ -22,7 +23,9 @@ library(scales)
 \*Traemos el archivo csv a R como una tabla, muestra su estructura (filas, columnas, tipos de dato) y un resumen estadístico rápido de cada columna.
 
 ```{r}
-datos <- read_csv("datos/dataset_sube.csv")
+# here() arma la ruta desde la raíz del proyecto (donde está Tp-sube.Rproj),
+# así funciona aunque Quarto renderice desde la carpeta reportes/
+datos <- read_csv(here("datos", "procesados", "dataset_sube.csv"))
 glimpse(datos)
 summary(datos)
 ```
@@ -33,9 +36,9 @@ summary(datos)
 
 \*Conviertimos el número de día (0, 1, 2...) en su nombre real ("Lunes", "Martes"...), para que las tablas y gráficos sean más fáciles de leer en vez de mostrar números crípticos.
 
-\*Numéricas: colectivo_amba, subte_amba, tren_amba
+\*Numéricas: colectivo_amba, subte_amba, tren_amba (usuarios por día de cada modo) y total_amba (usuarios únicos del día).
 
-\*Categoría: anio, mes, dia_semana.
+\*Categoría: anio, mes, dia_semana. Además está la fecha (fecha real de cada registro).
 
 ```{r}
 dias <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")

@@ -1,0 +1,30 @@
+[
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "Acerca de",
+    "section": "",
+    "text": "Autoras: Valentina Barroso y Karen Del Pino."
+  },
+  {
+    "objectID": "about.html#datos",
+    "href": "about.html#datos",
+    "title": "Acerca de",
+    "section": "Datos",
+    "text": "Datos\nUsamos el conjunto de datos abiertos Total de usuarios por día en el AMBA del Ministerio de Transporte de la Nación (tarjeta SUBE), desde el 1 de enero de 2020.\n\nLos valores son usuarios por día, no viajes: una persona que viaja varias veces en colectivo el mismo día cuenta una sola vez.\nTotal son usuarios únicos. Es menor que colectivo + tren + subte, porque quien combina dos modos el mismo día aparece en los dos modos, pero una sola vez en el total.\nLa fuente no tiene datos de agosto de 2022 ni de enero de 2024. Por eso las líneas del gráfico se cortan en esos meses."
+  },
+  {
+    "objectID": "about.html#qué-muestra-cada-pestaña",
+    "href": "about.html#qué-muestra-cada-pestaña",
+    "title": "Acerca de",
+    "section": "Qué muestra cada pestaña",
+    "text": "Qué muestra cada pestaña\n\nResumen: cuántos usuarios tiene cada transporte y cómo se recuperó el uso después de la cuarentena de 2020.\nColectivo, Tren y Subte: para cada modo, tres preguntas:\n\n¿Cómo evolucionó? Promedio de 7 días. Se filtra por fecha con los botones (3 meses, 1 año, 3 años, Todo) o con la barra de abajo del gráfico.\n¿Qué días se usa más? Boxplot por día de la semana. Se filtra por año con el menú; la opción “Sin 2020” saca la pandemia, que deforma las cajas.\n¿Cambia según el mes? Una línea por año. Haciendo click en la leyenda se ocultan o muestran años.\n\nDatos: la tabla día por día, con buscador.\n\nCada filtro afecta solo a su gráfico, así no se mezclan análisis distintos. Las tarjetas muestran el promedio diario de los últimos 12 meses con datos."
+  },
+  {
+    "objectID": "about.html#escala",
+    "href": "about.html#escala",
+    "title": "Acerca de",
+    "section": "Escala",
+    "text": "Escala\nUsamos la escala argentina: coma decimal, punto de miles, y “millones” o “mil” (nunca “B”, porque en Argentina un billón es un millón de millones).\nCódigo y datos: github.com/karenDelPino/Tp-Sube"
+  }
+]

@@ -2,100 +2,114 @@
 
 # =====================================================================
 # SCRIPT: descarga.sh
-# Descarga automáticamente el dataset_sube SUBE de la fuente oficial
-# y transforma la fecha en año, mes y día de la semana.
+# Descarga el dataset SUBE (usuarios por día en el AMBA) de la fuente
+# oficial y genera una versión limpia lista para R.
+#
+# Ejecutar desde la RAÍZ del proyecto:   bash scripts/descarga.sh
+#
+# Genera:
+#   datos/crudos/dataset_sube_original.csv   (archivo original, sin tocar)
+#   datos/procesados/dataset_sube.csv        (archivo limpio)
+#
+# IMPORTANTE: los valores son USUARIOS por día, no viajes.
+#   - colectivo_amba, subte_amba, tren_amba: usuarios de cada modo.
+#   - total_amba: usuarios únicos. Es menor que la suma de los tres
+#     modos, porque quien usa dos modos el mismo día cuenta una sola vez.
+# La fuente no tiene todos los días (faltan, por ejemplo, agosto 2022 y
+# enero 2024), por eso guardamos la fecha real y nunca la recalculamos.
 # =====================================================================
+
+set -e
+
+URL="https://archivos-datos.transporte.gob.ar/upload/Sube/total-usuarios-por-dia-AMBA.csv"
+CRUDO="datos/crudos/dataset_sube_original.csv"
+LIMPIO="datos/procesados/dataset_sube.csv"
 
 echo "==============================================="
 echo "DESCARGA Y LIMPIEZA DE DATOS SUBE"
 echo "==============================================="
 
-# PASO 1: Crear carpeta datos
+# PASO 1: Crear carpetas
 echo ""
-echo "PASO 1: Crear carpeta 'datos'..."
+echo "PASO 1: Crear carpetas de datos..."
+mkdir -p datos/crudos datos/procesados
+echo "  ✓ Carpetas 'datos/crudos' y 'datos/procesados' listas"
 
-mkdir -p datos
-echo "  ✓ Carpeta 'datos' creada"
-
-# PASO 2: DESCARGAR del servidor oficial
+# PASO 2: Descargar del servidor oficial
 echo ""
-echo "PASO 2: Descargar dataset_sube desde servidor SUBE..."
+echo "PASO 2: Descargar dataset desde el servidor oficial..."
 
-URL="https://archivos-datos.transporte.gob.ar/upload/Sube/total-usuarios-por-dia-AMBA.csv"
-
-# Usar curl o wget (lo que este disponible)
 if command -v curl &> /dev/null; then
     echo "  Usando curl..."
-    curl -L -o datos/dataset_sube_original.csv "$URL"
+    curl -fL -o "$CRUDO" "$URL"
 elif command -v wget &> /dev/null; then
     echo "  Usando wget..."
-    wget -O datos/dataset_sube_original.csv "$URL"
+    wget -O "$CRUDO" "$URL"
 else
     echo "  ❌ ERROR: Necesitas curl o wget instalado"
     exit 1
 fi
 
-# Verificar que descargo correctamente
-if [ -f "datos/dataset_sube_original.csv" ]; then
-    echo "  ✓ Archivo descargado correctamente"
+if [ -s "$CRUDO" ]; then
+    echo "  ✓ Archivo descargado: $CRUDO"
 else
     echo "  ❌ Error al descargar. Verifica tu conexion a internet"
     exit 1
 fi
 
-# PASO 3: Limpiar y transformar datos
+# PASO 3: Limpiar y transformar
 echo ""
-echo "PASO 3: Transformar datos (extraer anio, mes y dia de la semana)..."
+echo "PASO 3: Transformar datos (fecha real, anio, mes y dia de la semana)..."
 
-python3 -c "
+python3 - "$CRUDO" "$LIMPIO" <<'PYTHON'
 import csv
+import sys
 from datetime import datetime
 
-with open('datos/dataset_sube_original.csv', mode='r', encoding='utf-8') as infile, \
-     open('datos/dataset_sube.csv', mode='w', encoding='utf-8', newline='') as outfile:
-    
-    reader = csv.DictReader(infile)
-    fieldnames = ['colectivo_amba', 'subte_amba', 'tren_amba', 'anio', 'mes', 'dia_semana']
-    writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-    
-    writer.writeheader()
-    for row in reader:
+origen, destino = sys.argv[1], sys.argv[2]
+campos = ['fecha', 'anio', 'mes', 'dia_semana',
+          'colectivo_amba', 'subte_amba', 'tren_amba', 'total_amba']
+
+filas = {}
+with open(origen, mode='r', encoding='utf-8-sig') as infile:
+    for row in csv.DictReader(infile):
         dt = datetime.strptime(row['indice_tiempo'].strip(), '%Y-%m-%d')
-        writer.writerow({
+        # Si una fecha viniera repetida, nos quedamos con la última
+        filas[dt] = {
+            'fecha': dt.strftime('%Y-%m-%d'),
+            'anio': dt.year,
+            'mes': dt.month,
+            'dia_semana': dt.weekday(),  # 0 = Lunes, 6 = Domingo
             'colectivo_amba': row['colectivo_amba'].strip(),
             'subte_amba': row['subte_amba'].strip(),
             'tren_amba': row['tren_amba'].strip(),
-            'anio': dt.year,
-            'mes': dt.month,
-            'dia_semana': dt.weekday()  # 0 = Lunes, 6 = Domingo
-        })
-"
-# Comprobar si Python pudo procesar el archivo correctamente
-if [ $? -ne 0 ]; then
-    echo "  ❌ ERROR: Ocurrio un fallo en Python (Asegurate de cerrar RStudio o Excel si tienen el archivo abierto)."
-    exit 1
-fi
+            'total_amba': row['total_amba'].strip(),
+        }
 
-echo "  ✓ Datos transformados y guardados en 'datos/dataset_sube.csv'"
+with open(destino, mode='w', encoding='utf-8', newline='') as outfile:
+    writer = csv.DictWriter(outfile, fieldnames=campos)
+    writer.writeheader()
+    for dt in sorted(filas):
+        writer.writerow(filas[dt])
+
+fechas = sorted(filas)
+huecos = [(a, b) for a, b in zip(fechas, fechas[1:]) if (b - a).days > 1]
+print(f"  Filas: {len(fechas)}  |  Desde {fechas[0]:%d/%m/%Y} hasta {fechas[-1]:%d/%m/%Y}")
+for a, b in huecos:
+    print(f"  ⚠ Faltan datos entre {a:%d/%m/%Y} y {b:%d/%m/%Y} ({(b - a).days - 1} días)")
+PYTHON
+
+echo "  ✓ Datos guardados en '$LIMPIO'"
 
 # PASO 4: Verificar
-LINEAS=$(wc -l < datos/dataset_sube.csv)
-echo "  ✓ Total de lineas: $LINEAS"
-
 echo ""
-echo "Primeras 5 lineas del dataset_sube:"
-head -5 datos/dataset_sube.csv
+echo "Primeras 5 lineas:"
+head -5 "$LIMPIO"
 
-# PASO 5: Resumen
 echo ""
 echo "==============================================="
 echo "PROCESO COMPLETADO"
 echo "==============================================="
-echo ""
-echo "Archivos generados:"
-echo "  • datos/dataset_sube_original.csv (archivo original descargado)"
-echo "  • datos/dataset_sube.csv (archivo limpio, LISTO PARA R)"
-echo ""
 echo "Proximo paso en RStudio:"
-echo "  datos <- read.csv('datos/dataset_sube.csv')"
+echo "  datos <- readr::read_csv(here::here('datos', 'procesados', 'dataset_sube.csv'))"
 echo ""
